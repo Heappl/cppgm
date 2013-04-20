@@ -1,16 +1,39 @@
 #include <iostream>
+#include <sstream>
+#include <fstream>
 
-#include "ExampleClass1.h"
-#include "ExampleClass2.h"
+using namespace std;
+
+#include "IPPTokenStream.h"
+#include "DebugPPTokenStream.h"
+#include "StandardData.hpp"
+#include "PPTokenizer.hpp"
 
 int main()
 {
-	std::cout << "pptoken main" << std::endl;
+	try
+	{
+		ostringstream oss;
+		oss << cin.rdbuf();
 
-	ExampleClass1 x;
-	ExampleClass2 y;
+		string input = oss.str();
 
-	x.f();
-	y.f();
+		DebugPPTokenStream output;
+
+		PPTokenizer tokenizer(output);
+
+		for (char c : input)
+		{
+			unsigned char code_unit = c;
+			tokenizer.process(code_unit);
+		}
+
+		tokenizer.process(EndOfFile);
+	}
+	catch (exception& e)
+	{
+		cerr << "ERROR: " << e.what() << endl;
+		return EXIT_FAILURE;
+	}
 }
 

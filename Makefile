@@ -5,8 +5,13 @@ apps = \
 	posttoken
 
 units = \
-	ExampleClass1 \
-	ExampleClass2
+    ExampleClass1 \
+    ExampleClass2 \
+	Helpers \
+	PPTokenizer \
+	RegexRule \
+	StandardData \
+	StateMachine
 
 all: $(apps)
 
