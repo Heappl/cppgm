@@ -1,5 +1,6 @@
 #include "Helpers.hpp"
 #include <stdexcept>
+#include <sstream>
 
 int HexCharToValue(int c)
 {
@@ -28,6 +29,30 @@ int HexCharToValue(int c)
 	case 'F': return 15;
 	case 'f': return 15;
 	default: throw std::logic_error("HexCharToValue of nonhex char");
+	}
+}
+
+char ValueToHexChar(int c)
+{
+	switch (c)
+	{
+	case 0: return '0';
+	case 1: return '1';
+	case 2: return '2';
+	case 3: return '3';
+	case 4: return '4';
+	case 5: return '5';
+	case 6: return '6';
+	case 7: return '7';
+	case 8: return '8';
+	case 9: return '9';
+	case 10: return 'A';
+	case 11: return 'B';
+	case 12: return 'C';
+	case 13: return 'D';
+	case 14: return 'E';
+	case 15: return 'F';
+	default: throw std::logic_error("ValueToHexChar of nonhex value");
 	}
 }
 
@@ -107,5 +132,44 @@ std::vector<std::pair<int, int>> convertToWide(std::vector<std::pair<int, int>> 
         else out.push_back({toWideChar(elem.first), toWideChar(elem.second)});
     }
     return out;
+}
+
+std::string HexDump(const void* pdata, size_t nbytes)
+{
+	unsigned char* p = (unsigned char*) pdata;
+
+	std::string s(nbytes*2, '?');
+
+	for (size_t i = 0; i < nbytes; i++)
+	{
+		s[2*i+0] = ValueToHexChar((p[i] & 0xF0) >> 4);
+		s[2*i+1] = ValueToHexChar((p[i] & 0x0F) >> 0);
+	}
+
+	return s;
+}
+
+float PA2Decode_float(const std::string& s)
+{
+	std::istringstream iss(s);
+	float x;
+	iss >> x;
+	return x;
+}
+
+double PA2Decode_double(const std::string& s)
+{
+	std::istringstream iss(s);
+	double x;
+	iss >> x;
+	return x;
+}
+
+long double PA2Decode_long_double(const std::string& s)
+{
+	std::istringstream iss(s);
+	long double x;
+	iss >> x;
+	return x;
 }
 

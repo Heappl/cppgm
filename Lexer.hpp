@@ -142,6 +142,22 @@ struct TokenizerChainLinkType
     typedef PrevOut PrevOutType;
 };
 
+template <typename LinkHandler, typename PrevOutType, typename Link, typename InType>
+struct TokenizerChainLinkHandler
+{
+    LinkHandler handler;
+    Link link;
+
+    TokenizerChainLinkHandler(LinkHandler handler, Link link) : handler(handler), link(link)
+    {
+    }
+
+    void operator()(PrevOutType token, std::wstring text)
+    {
+        handler(token, text, [&](InType token, std::wstring text){ link.process(token, text); });
+    }
+};
+
 template <typename TokenizerChainLink, typename... OtherLinks>
 struct TokenizerChain : TokenizerChain<OtherLinks...>
 {
@@ -155,7 +171,7 @@ struct TokenizerChain : TokenizerChain<OtherLinks...>
     typedef std::function<void(InType, std::wstring)> NextLinkHandler;
     typedef std::function<void(PrevOutType, std::wstring, NextLinkHandler)> PhaseLinker;
 
-    typename TokenizerChainLink::type link;
+    typedef typename TokenizerChainLink::type Link;
     LinkHandler handler;
 
     template <typename FinalHandler, typename... TailDefinitions>
@@ -164,9 +180,8 @@ struct TokenizerChain : TokenizerChain<OtherLinks...>
         const std::pair<PhaseLinker, Definitions>& thisLinkData,
         const TailDefinitions& ...tailLinksData)
         : TokenizerChain<OtherLinks...>(finalLinkHandler, tailLinksData...),
-          link(TokenizerChain<OtherLinks...>::handler, thisLinkData.second),
-          handler([&](PrevOutType token, std::wstring text) {
-             thisLinkData.first(token, text, [&](InType token, std::wstring text){ link.process(token, text); }); })
+          handler(TokenizerChainLinkHandler<PhaseLinker, PrevOutType, Link, InType>
+                    (thisLinkData.first, Link(TokenizerChain<OtherLinks...>::handler, thisLinkData.second)))
     {}
 };
 template <typename TokenizerChainLink>
@@ -182,16 +197,15 @@ struct TokenizerChain<TokenizerChainLink>
     typedef std::function<void(InType, std::wstring)> NextLinkHandler;
     typedef std::function<void(PrevOutType, std::wstring, NextLinkHandler)> PhaseLinker;
 
-    typename TokenizerChainLink::type link;
+    typedef typename TokenizerChainLink::type Link;
     LinkHandler handler;
 
     template <typename PhaseLinker, typename FinalLinkHander>
     TokenizerChain(
         FinalLinkHander finalLinkHandler,
         const std::pair<PhaseLinker, Definitions>& linkData)
-        : link(finalLinkHandler, linkData.second),
-          handler([&](PrevOutType token, std::wstring text) {
-             linkData.first(token, text, [&](InType token, std::wstring text){ link.process(token, text); }); })
+        : handler(TokenizerChainLinkHandler<PhaseLinker, PrevOutType, Link, InType>
+                    (linkData.first, Link(finalLinkHandler, linkData.second)))
     {}
 };
 

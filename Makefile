@@ -5,17 +5,16 @@ apps = \
 	posttoken
 
 units = \
-    ExampleClass1 \
-    ExampleClass2 \
 	Helpers \
 	PPTokenizer \
 	RegexRule \
 	StandardData \
-	StateMachine
+	StateMachine \
+	PostTokenAnalyser
 
 all: $(apps)
 
-CXXFLAGS = -MD -g -O2 -std=gnu++11
+CXXFLAGS = -MD -g -O3 -std=gnu++11
 
 clean:
 	-rm $(apps) *.o *.d

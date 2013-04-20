@@ -2,6 +2,7 @@
 #define PPTOKENIZER_HPP
 
 #include "IPPTokenStream.h"
+#include <memory>
 
 // Translation features you need to implement:
 // - utf8 decoder
@@ -13,11 +14,15 @@
 // - comment striping (can be part of whitespace-sequence)
 // Tokenizer
 
-struct PPTokenizer
+class PPTokenizer
 {
-	IPPTokenStream& output;
+    struct PPTokenizerImpl;
 
-	PPTokenizer(IPPTokenStream& output);
+	std::shared_ptr<IPPTokenStream> output;
+    std::shared_ptr<PPTokenizerImpl> impl;
+
+public:
+	PPTokenizer(std::shared_ptr<IPPTokenStream> output);
 	void process(int c);
 };
 

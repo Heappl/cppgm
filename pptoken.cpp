@@ -18,7 +18,7 @@ int main()
 
 		string input = oss.str();
 
-		DebugPPTokenStream output;
+		std::shared_ptr<DebugPPTokenStream> output = std::make_shared<DebugPPTokenStream>();
 
 		PPTokenizer tokenizer(output);
 

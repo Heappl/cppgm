@@ -1,0 +1,40 @@
+#pragma once
+
+// See 3.9.1: Fundamental Types
+enum EFundamentalType
+{
+	// 3.9.1.2
+	FT_SIGNED_CHAR,
+	FT_SHORT_INT,
+	FT_INT,
+	FT_LONG_INT,
+	FT_LONG_LONG_INT,
+
+	// 3.9.1.3
+	FT_UNSIGNED_CHAR,
+	FT_UNSIGNED_SHORT_INT,
+	FT_UNSIGNED_INT,
+	FT_UNSIGNED_LONG_INT,
+	FT_UNSIGNED_LONG_LONG_INT,
+
+	// 3.9.1.1 / 3.9.1.5
+	FT_WCHAR_T,
+	FT_CHAR,
+	FT_CHAR16_T,
+	FT_CHAR32_T,
+
+	// 3.9.1.6
+	FT_BOOL,
+
+	// 3.9.1.8
+	FT_FLOAT,
+	FT_DOUBLE,
+	FT_LONG_DOUBLE,
+
+	// 3.9.1.9
+	FT_VOID,
+
+	// 3.9.1.10
+	FT_NULLPTR_T
+};
+
