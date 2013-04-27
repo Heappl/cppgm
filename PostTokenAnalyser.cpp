@@ -1,5 +1,6 @@
 #include "PostTokenAnalyser.hpp"
 #include "StandardData.hpp"
+#include "Helpers.hpp"
 #include <vector>
 
 PostTokenAnalyser::PostTokenAnalyser(std::shared_ptr<IPostTokenStream> output)
@@ -32,8 +33,18 @@ void PostTokenAnalyser::emit_identifier(const string& data)
 
 void PostTokenAnalyser::emit_pp_number(const string& data)
 {
-    std::vector<unsigned char> out(4, 0);
-    output->emit_literal(data, EFundamentalType::FT_INT, &out.front(), out.size());
+    if ((data.find('.') == std::string::npos)
+         && (data.find('e') == std::string::npos)
+         && (data.find('E') == std::string::npos))
+    {
+        int aux = int(PA2Decode_double(data));
+        output->emit_literal(data, EFundamentalType::FT_INT, &aux, sizeof(aux));
+    }
+    else
+    {
+        double aux = PA2Decode_double(data);
+        output->emit_literal(data, EFundamentalType::FT_DOUBLE, &aux, sizeof(aux));
+    }
 }
 
 void PostTokenAnalyser::emit_character_literal(const string& data)
@@ -63,6 +74,7 @@ void PostTokenAnalyser::emit_preprocessing_op_or_punc(const string& data)
 
 void PostTokenAnalyser::emit_non_whitespace_char(const string& data)
 {
+    output->emit_invalid(data);
 }
 
 void PostTokenAnalyser::emit_eof()
