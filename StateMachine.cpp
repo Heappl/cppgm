@@ -183,3 +183,17 @@ bool StateMachine::foreverUnmatched()
     return states.empty();
 }
 
+bool matches(const Rule& rule, std::wstring str)
+{
+    StateMachine machine(rule);
+    bool ret = false;
+    for (auto c : str)
+        ret = machine.process(c);
+    return ret;
+}
+
+bool matches(const Rule& rule, std::string str)
+{
+    return matches(rule, std::wstring(str.begin(), str.end()));
+}
+

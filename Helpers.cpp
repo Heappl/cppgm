@@ -159,7 +159,7 @@ float PA2Decode_float(const std::string& s)
 
 double PA2Decode_double(const std::string& s)
 {
-	std::istringstream iss(s);
+	std::stringstream iss(s);
 	double x;
 	iss >> x;
 	return x;
@@ -167,9 +167,19 @@ double PA2Decode_double(const std::string& s)
 
 long double PA2Decode_long_double(const std::string& s)
 {
-	std::istringstream iss(s);
+	std::istringstream ss(s);
 	long double x;
-	iss >> x;
+	ss >> x;
 	return x;
 }
 
+long long PA2Decode_long_long(const std::string& s, bool isHex, bool isOctet)
+{
+	std::stringstream ss;
+    if (isHex) ss << std::hex;
+    if (isOctet) ss << std::oct;
+    ss << s;
+	long long x;
+	ss >> x;
+	return x;
+}

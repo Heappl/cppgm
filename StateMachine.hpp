@@ -14,5 +14,8 @@ public:
     bool foreverUnmatched();
 };
 
+bool matches(const Rule& rule, std::wstring str);
+bool matches(const Rule& rule, std::string str);
+
 #endif //STATE_MACHINE_HPP
 

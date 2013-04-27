@@ -22,6 +22,7 @@ std::string HexDump(const void* pdata, size_t nbytes);
 float PA2Decode_float(const std::string& s);
 double PA2Decode_double(const std::string& s);
 long double PA2Decode_long_double(const std::string& s);
+long long PA2Decode_long_long(const std::string& s, bool isHex,bool isOctet);
 
 #endif //HELPERS_HPP
 
