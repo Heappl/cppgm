@@ -53,7 +53,7 @@ struct TokenizerMachine
         }
     }
 
-    void process(wchar_t c, std::wstring actualText)
+    void process(uint64_t c, std::wstring actualText)
     {
         buffer += actualText;
         processed += actualText.size();
@@ -119,7 +119,7 @@ struct TokenizerChainLink
 
     void process(const InType& token, std::wstring actualText)
     {
-        machine.process(wchar_t(token), actualText);
+        machine.process(uint64_t(token), actualText);
     }
 
     TokenMatcher createMatcher(const TokenDefinition& definition)

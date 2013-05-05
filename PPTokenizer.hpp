@@ -23,7 +23,7 @@ class PPTokenizer
 
 public:
 	PPTokenizer(std::shared_ptr<IPPTokenStream> output);
-	void process(int c);
+	void process(uint64_t c);
 };
 
 

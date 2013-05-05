@@ -11,21 +11,24 @@
 #include <deque>
 #include <map>
 #include <functional>
-#include <functional>
+#include <limits>
 #include "RegexRule.hpp"
 #include "StateMachine.hpp"
 #include "Lexer.hpp"
 
 namespace {
 
-constexpr wchar_t CommentBegin = wchar_t(-2);
-constexpr wchar_t StartOfFile = wchar_t(-3);
+constexpr uint64_t CommentBegin = std::numeric_limits<uint64_t>::max() - 1;
+constexpr uint64_t StartOfFile = std::numeric_limits<uint64_t>::max() - 2;
+constexpr uint64_t String = std::numeric_limits<uint64_t>::max() - 3;
 
 enum class PrephaseToken
 {
     Trigraph,
     RawString,
-    PlainCharacter
+    PlainCharacter,
+    StartOfFile,
+    EndOfFile
 };
 
 enum class Token
@@ -48,6 +51,9 @@ enum class FirstPhaseToken
     MultiLineCommentStart,
     UniversalCharacterTuple,
     UniversalCharacter,
+    String,
+    EndOfFile,
+    StartOfFile,
     EscapedLineBreak
 };
 enum class CommentPhaseToken
@@ -56,17 +62,21 @@ enum class CommentPhaseToken
     SingleLineComment,
     MultiLineComment,
     StringLiteral,
+    String,
+    EndOfFile,
+    StartOfFile,
+    CommentBegin,
     CharacterLiteral
 };
 
 typedef TokenizerChain<
-    TokenizerChainLinkType<wchar_t, wchar_t, PrephaseToken>,
-    TokenizerChainLinkType<PrephaseToken, wchar_t, FirstPhaseToken>,
-    TokenizerChainLinkType<FirstPhaseToken, wchar_t, CommentPhaseToken>,
-    TokenizerChainLinkType<CommentPhaseToken, wchar_t, Token>> ChainedTokenizer;
+    TokenizerChainLinkType<uint64_t, uint64_t, PrephaseToken>,
+    TokenizerChainLinkType<PrephaseToken, uint64_t, FirstPhaseToken>,
+    TokenizerChainLinkType<FirstPhaseToken, uint64_t, CommentPhaseToken>,
+    TokenizerChainLinkType<CommentPhaseToken, uint64_t, Token>> ChainedTokenizer;
 
-typedef std::function<void (wchar_t, std::wstring)> Handler;
-typedef std::function<void(wchar_t, std::wstring, Handler)> InitialLinker;
+typedef std::function<void (uint64_t, std::wstring)> Handler;
+typedef std::function<void(uint64_t, std::wstring, Handler)> InitialLinker;
 typedef std::function<void(PrephaseToken, std::wstring, Handler)> PreToFirstPhaseLinker;
 typedef std::function<void(FirstPhaseToken, std::wstring, Handler)> FirstToCommentPhaseLinker;
 typedef std::function<void(CommentPhaseToken, std::wstring, Handler)> CommentToSecondPhaseLinker;
@@ -77,6 +87,7 @@ typedef std::vector<std::pair<Token, Rule>> SecondPhaseDefinitions;
 
 void tokenHandler(Token token, std::wstring val, std::shared_ptr<IPPTokenStream>& output)
 {
+    //std::wcerr << L"tokenHandler: " << std::hex << uint64_t(token) << L" " << val << std::endl;
     if (token == Token::CharacterLiteral)
     {
         if (val.back() != '\'')
@@ -125,38 +136,126 @@ void tokenHandler(Token token, std::wstring val, std::shared_ptr<IPPTokenStream>
 
 void commentAndSecondPhaseLinker(CommentPhaseToken t, std::wstring text, Handler h)
 {
-    if (t == CommentPhaseToken::PlainCharacter) h(text[0], text);
+    //std::wcerr << L"commentAndSecondPhaseLinker: " << std::hex << uint64_t(t) << L" " << uint64_t(text[0]) << std::endl;
+    if (t == CommentPhaseToken::PlainCharacter) h(wcharToUint64(text[0]), text);
     if (t == CommentPhaseToken::MultiLineComment) h(' ', text);
     if (t == CommentPhaseToken::SingleLineComment) h(' ', text);
-    if ((t == CommentPhaseToken::StringLiteral) || (t == CommentPhaseToken::CharacterLiteral))
-        for (auto c : text) h(c, {c});
+    if (t == CommentPhaseToken::CharacterLiteral)
+        for (auto c : text) h(wcharToUint64(c), {c});
+    if ((t == CommentPhaseToken::StringLiteral) || (t == CommentPhaseToken::String))
+        h(String, text);
+    if (t == CommentPhaseToken::StartOfFile) h(StartOfFile, text);
+    if (t == CommentPhaseToken::EndOfFile) h(EndOfFile, text);
+    if (t == CommentPhaseToken::CommentBegin) h(CommentBegin, text);
 }
 void firstAndCommentPhaseLinker(FirstPhaseToken t, std::wstring text, Handler h)
 {
-    if (t == FirstPhaseToken::PlainCharacter) h(text[0], text);
+    //std::wcerr << L"firstAndCommentPhaseLinker: " << std::hex << uint64_t(t) << L" " << text << std::endl;
+    if (t == FirstPhaseToken::PlainCharacter) h(wcharToUint64(text[0]), text);
     if (t == FirstPhaseToken::MultiLineCommentStart) h(CommentBegin, text);
     if (t == FirstPhaseToken::UniversalCharacterTuple)
     {
-        int aux = 0;
+        uint64_t aux = 0;
         for (unsigned i = 2; i < text.size(); ++i)
             aux = (aux << 4) + HexCharToValue(text[i]);
         wchar_t c = toWideCharInUtf8(aux);
-        h(c, {c});
+        //std::wcerr << text << L": " << std::hex << wcharToUint64(c) << L" " << std::wstring({c}) << std::endl;
+        h(wcharToUint64(c), {c});
     }
     if (t == FirstPhaseToken::UniversalCharacter)
     {
-        int aux = 0;
+        uint64_t aux = 0;
         for (unsigned i = 0; i < text.size(); ++i)
-            aux = (aux << 8) + int(text[i]);
-        wchar_t c = wchar_t(aux);
-        h(c, {c});
+            aux = (aux << 8) + wcharToUint64(text[i]);
+        h(aux, {wchar_t(aux)});
     }
+    if (t == FirstPhaseToken::String) h(String, text);
+    if (t == FirstPhaseToken::StartOfFile) h(StartOfFile, text);
+    if (t == FirstPhaseToken::EndOfFile) h(EndOfFile, text);
 }
+
+struct RawStringProcessor
+{
+    const std::wstring invalid;
+
+    bool gettingOpening;
+    bool gettingClosing;
+    std::wstring rawStringId;
+    std::wstring rawString;
+    unsigned lastMatchedRawStringIdIndex;
+
+    RawStringProcessor()
+        : invalid(L"() \\\n\t\v\r\b\f"),
+          gettingOpening(true),
+          gettingClosing(false),
+          rawString(L"R\""),
+          lastMatchedRawStringIdIndex(0)
+    {}
+    
+    void reset()
+    {
+        gettingClosing = false;
+        gettingOpening = true;
+        lastMatchedRawStringIdIndex = 0;
+        rawString = L"R\"";
+        rawStringId = L"";
+    }
+
+    bool process(uint64_t c)
+    {
+        rawString += {wchar_t(c)};
+        //std::wcerr << L"rawString: " << rawString << L" " << rawStringId
+                    //<< L" " << gettingOpening << L" " << gettingClosing
+                    //<< L" " << std::hex << c << std::endl;
+        if (c == EndOfFile) throw IncompleteToken<PrephaseToken>(rawString, PrephaseToken::RawString);
+        else if (gettingOpening)
+        {
+            if (c == '(')
+            {
+                gettingOpening = false;
+                rawStringId += L"\"";
+            }
+            else if (invalid.find(c) != std::string::npos) throw InvalidChar({wchar_t(c)});
+            else rawStringId += {wchar_t(c)};
+        }
+        else if (gettingClosing)
+        {
+            if ((lastMatchedRawStringIdIndex >= rawStringId.size())
+                || (rawStringId[lastMatchedRawStringIdIndex] != c))
+            {
+                lastMatchedRawStringIdIndex = 0;
+                gettingClosing = false;
+            }
+            else ++lastMatchedRawStringIdIndex;
+            if (lastMatchedRawStringIdIndex == rawStringId.size())
+                return true;
+        }
+        else if (c == ')') gettingClosing = true;
+        return false;
+    }
+};
 
 void prephaseLinker(PrephaseToken t, std::wstring text, Handler h)
 {
-    if (t == PrephaseToken::PlainCharacter) h(text[0], text);
-    if (t == PrephaseToken::Trigraph)
+    static RawStringProcessor rawStringProcessor;
+    static bool isRawString = false;
+    //std::wcerr << L"prephaseLinker: " << std::hex << uint64_t(t) << L" " << text << L" " << isRawString << std::endl;
+
+    if (isRawString)
+    {
+        bool finished = false;
+        for (auto c : text) finished = rawStringProcessor.process(c);
+        if (finished)
+        {
+            h(String, rawStringProcessor.rawString);
+            isRawString = false;
+        }
+    }
+    else if (t == PrephaseToken::PlainCharacter)
+    {
+        h(wcharToUint64(text[0]), text);
+    }
+    else if (t == PrephaseToken::Trigraph)
     {
         switch(text[text.size() - 1])
         {
@@ -171,10 +270,13 @@ void prephaseLinker(PrephaseToken t, std::wstring text, Handler h)
             case L'-': h(L'~', L"~"); break;
         }
     }
-    if (t == PrephaseToken::RawString)
+    else if (t == PrephaseToken::RawString)
     {
-        for (auto c : text) h(c, {c});
+        isRawString = true;
+        rawStringProcessor.reset();
     }
+    else if (t == PrephaseToken::StartOfFile) h(StartOfFile, text);
+    else if (t == PrephaseToken::EndOfFile) h(EndOfFile, text);
 }
 
 std::vector<std::wstring> ops = {
@@ -184,9 +286,6 @@ std::vector<std::wstring> ops = {
     L"&=", L"|=", L"<<", L">>", L">>=", L"<<=", L"==", L"!=", L"<=", L">=", L"&&", L"||", L"++",
     L"--", L",", L"->*", L"->", L"and", L"and_eq", L"bitand", L"bitor", L"compl", L"not",
     L"not_eq", L"or", L"or_eq", L"xor", L"xor_eq"
-};
-std::vector<std::wstring> stringLiteralsOpenQuotes = {
-    L"\"", L"R\"", L"u8\"", L"u8R\"", L"u\"", L"uR\"", L"U\"", L"UR\"", L"L\"", L"LR\""
 };
 std::wstring stringLiteralPostfixChars = L" ()\\" + std::wstring({wchar_t(0), L'-', wchar_t(37)});
 
@@ -222,17 +321,19 @@ struct PPTokenizer::PPTokenizerImpl
           hex(chset(L"0-9a-fA-F")),
           hexquad(hex >> hex >> hex >> hex),
           usedChar(firstIdentifierChar | chset(L"-0-9~^{}[]#()<>:%;.?.+*/&|=!,\"' \n\t\v\r\b\f")),
-          startOfFile({StartOfFile}),
+          startOfFile(chset(StartOfFile)),
           stringLiteralContent(*(~chset(L"\\\"") | (L"\\" >> anychar) | chset(CommentBegin))),
           charLiteralContent(*(~chset(L"\\'") | (L"\\" >> anychar) | chset(CommentBegin))),
           tokenizerChain(
               std::bind(tokenHandler, std::placeholders::_1, std::placeholders::_2, output),
               std::pair<InitialLinker, PrephaseDefinitions>(
-                  [](wchar_t c, std::wstring text, Handler h) { h(c, text); },
+                  [](uint64_t c, std::wstring text, Handler h) { h(c, text); },
                   {
                       {PrephaseToken::Trigraph, L"??" >> chset(L"=/'()!<>-")},
-                      {PrephaseToken::RawString, L"R\"" >> stringLiteralContent >> L"\"" },
-                      {PrephaseToken::PlainCharacter, (anychar | chset(wchar_t(EndOfFile)))}
+                      {PrephaseToken::RawString, chseq(L"R\"") },
+                      {PrephaseToken::PlainCharacter, anychar},
+                      {PrephaseToken::EndOfFile, chset(EndOfFile)},
+                      {PrephaseToken::StartOfFile, chset(StartOfFile)}
                   }
               ),
               std::pair<PreToFirstPhaseLinker, FirstPhaseDefinitions>(
@@ -245,7 +346,10 @@ struct PPTokenizer::PPTokenizerImpl
                           | (chsetFromRanges({{0xe0, 0xef}}) >> utf8TrailingSymbol >> utf8TrailingSymbol)
                           | (chsetFromRanges({{0xc0, 0xdf}}) >> utf8TrailingSymbol)},
                       {FirstPhaseToken::MultiLineCommentStart, chseq(L"/*")},
-                      {FirstPhaseToken::PlainCharacter, (anychar | chset(wchar_t(EndOfFile)))}
+                      {FirstPhaseToken::String, chset(String) },
+                      {FirstPhaseToken::PlainCharacter, anychar},
+                      {FirstPhaseToken::EndOfFile, chset(EndOfFile)},
+                      {FirstPhaseToken::StartOfFile, chset(StartOfFile)}
                   }
               ),
               std::pair<FirstToCommentPhaseLinker, CommentPhaseDefinitions>(
@@ -255,7 +359,11 @@ struct PPTokenizer::PPTokenizerImpl
                       {CommentPhaseToken::MultiLineComment, chset(CommentBegin) >> *(~chset(L"*") | (L"*" >> ~chset(L"/"))) >> L"*/"},
                       {CommentPhaseToken::StringLiteral, L"\"" >> stringLiteralContent >> L"\""},
                       {CommentPhaseToken::CharacterLiteral, L"'" >> charLiteralContent >> L"'"},
-                      {CommentPhaseToken::PlainCharacter, (anychar | chset(wchar_t(EndOfFile)))}
+                      {CommentPhaseToken::String, chset(String) },
+                      {CommentPhaseToken::PlainCharacter, anychar},
+                      {CommentPhaseToken::EndOfFile, chset(EndOfFile)},
+                      {CommentPhaseToken::CommentBegin, chset(CommentBegin)},
+                      {CommentPhaseToken::StartOfFile, chset(StartOfFile)}
                   }
               ),
               std::pair<CommentToSecondPhaseLinker, SecondPhaseDefinitions>(
@@ -267,30 +375,33 @@ struct PPTokenizer::PPTokenizerImpl
                       {Token::CharacterLiteral,
                           ((chset(L"uUL") >> L"'") | L"'") >> charLiteralContent >> (L"'" | (L"'" >> identifier))},
                       {Token::WhiteSpace, *chset(L" \t\v\r\b\f")},
-                      {Token::Newline, L"\n" | Rule({EndOfFile}) | (L"\n" >> Rule({EndOfFile}))},
+                      {Token::Newline, L"\n" | chset(EndOfFile) | (L"\n" >> chset(EndOfFile))},
                       {Token::HeaderInclude,
                           (L"\n" | startOfFile) >> L"#include" >> *chset(L" \t\v\r\b\f") >>
-                              ((L"\"" >> *~chset(L"\"\n") >> L"\"") | (L"<" >> *~chset(L">\n") >> L">"))},
+                              ((L"\"" >> *~chset(L"\"\n") >> L"\"") | (L"<" >> *~chset(L">\n") >> L">") | chset(String))},
                       {Token::PreprocessingOpOrPunc, strset(ops)},
                       {Token::SpecialPreprocessingOpOrPuncSeq, strset({L"<::>", L"<::", L"<:::"})},
                       {Token::NonWhitespaceCharacter, ~usedChar - chset(wchar_t(0xff))},
-                      {Token::Ignore, Rule({StartOfFile})},
-                      {Token::StringLiteral,
-                          strset(stringLiteralsOpenQuotes) >> stringLiteralContent >> (L"\"" | (L"\"" >> identifier))},
+                      {Token::Ignore, chset(StartOfFile)},
+                      {Token::StringLiteral, 
+                        (chset(String) | ((chseq(L"u8") | chset(L"uUL")) >> chset(String))) >> !identifier}
                   }
               )
           )
-    { }
-
-    void handle(int c)
     {
-        tokenizerChain.handler(wchar_t(c), {wchar_t(c)});
+        //for (auto r : identifierNondigitChar.chset.ranges)
+            //std::wcerr << std::hex << r.first << L"-" << r.second << std::endl;
     }
-    void process(int c)
+
+    void handle(uint64_t c)
+    {
+        tokenizerChain.handler(c, {wchar_t(c)});
+    }
+    void process(uint64_t c)
     {
         if (not started)
         {
-            handle(int(StartOfFile));
+            handle(StartOfFile);
             started = true;
             if (c == EndOfFile)
             {
@@ -312,7 +423,7 @@ PPTokenizer::PPTokenizer(std::shared_ptr<IPPTokenStream> output)
 {
 }
 
-void PPTokenizer::process(int c)
+void PPTokenizer::process(uint64_t c)
 {
     impl->process(c);
 }

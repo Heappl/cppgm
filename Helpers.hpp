@@ -34,5 +34,7 @@ T PA2Decode(const std::string& s, bool isHex = false, bool isOctet = false)
 	return x;
 }
 
+uint64_t wcharToUint64(wchar_t arg);
+
 #endif //HELPERS_HPP
 

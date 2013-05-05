@@ -155,3 +155,8 @@ std::string HexDump(const void* pdata, size_t nbytes)
 	return s;
 }
 
+uint64_t wcharToUint64(wchar_t arg)
+{
+    return uint64_t(arg) & uint64_t(0xffffffff);
+}
+

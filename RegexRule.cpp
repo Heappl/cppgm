@@ -1,17 +1,20 @@
 #include "RegexRule.hpp"
+#include "Helpers.hpp"
 #include <iostream>
+#include <limits>
 
 Chset::Chset(std::wstring chset)
 {
     unsigned index = 0;
     while (index < chset.size())
     {
-        CharRange range = {chset[index], chset[index]};
+        CharRange range = {wcharToUint64(chset[index]),
+                           wcharToUint64(chset[index])};
         index++;
         if ((index < chset.size() - 1) && (chset[index] == L'-'))
         {
             ++index;
-            range.second = chset[index];
+            range.second = wcharToUint64(chset[index]);
             ++index;
         }
         ranges.insert(range);
@@ -21,21 +24,21 @@ Chset::Chset(std::wstring chset)
 Chset::Chset(std::vector<std::pair<int, int>> intRanges)
 {
     for (auto range : intRanges)
-        ranges.insert({range.first, range.second});
+        ranges.insert({range.first & MAX_ANYCHAR, range.second & MAX_ANYCHAR});
 }
 
 Chset Chset::operator~() const
 {
     Chset out;
-    unsigned prev = MIN_WCHAR;
+    uint64_t prev = MIN_ANYCHAR;
     for (auto range : ranges)
     {
-        if (range.first - 1 >= prev)
+        if ((range.first >= MIN_ANYCHAR) && (range.first - 1 >= prev))
             out.ranges.insert({prev, range.first - 1});
-        prev = std::max(unsigned(range.second + 1), prev);
+        prev = std::max(range.second + 1, prev);
     }
-    if (prev <= MAX_WCHAR)
-        out.ranges.insert({prev, MAX_WCHAR});
+    if (prev <= MAX_ANYCHAR)
+        out.ranges.insert({prev, MAX_ANYCHAR});
     return out;
 }
 
@@ -52,13 +55,21 @@ Chset Chset::operator-(const Chset& other) const
         else if ((it->first <= range.first) && (it->second >= range.second)) continue;
         else if ((it->first > range.first) && (it->second < range.second))
         {
-            out.ranges.insert({range.first, it->first - 1});
-            out.ranges.insert({it->second + 1, range.second});
+            if (it->first != std::numeric_limits<decltype(it->first)>::min())
+                out.ranges.insert({range.first, it->first - 1});
+            if (it->second != std::numeric_limits<decltype(it->first)>::max())
+                out.ranges.insert({it->second + 1, range.second});
         }
         else if (it->first > range.first)
-            out.ranges.insert({range.first, it->first - 1});
+        {
+            if (it->first != std::numeric_limits<decltype(it->first)>::min())
+                out.ranges.insert({range.first, it->first - 1});
+        }
         else
-            out.ranges.insert({it->second + 1, range.second});
+        {
+            if (it->second != std::numeric_limits<decltype(it->first)>::max())
+                out.ranges.insert({it->second + 1, range.second});
+        }
     }
     return out;
 }
@@ -130,6 +141,10 @@ Rule Rule::operator-(const Rule& other) const
         throw RuleException("subtract can be perform only on character sets");
     return Rule(chset - other.chset);
 }
+Rule Rule::operator!() const
+{
+    return *this | Rule(Type::DEmpty);
+}
 
 Rule operator>>(const wchar_t* left, const Rule& right)
 {
@@ -143,9 +158,19 @@ Rule operator|(const wchar_t* left, const Rule& right)
 
 Rule chset(wchar_t c)
 {
-    std::wstring aux;
-    aux.push_back(c);
-    return chset(aux);
+    return chset(wcharToUint64(c));
+}
+
+Rule chset(uint64_t arg)
+{
+    return chset(std::vector<uint64_t>({arg}));
+}
+Rule chset(std::vector<uint64_t> arg)
+{
+    Chset chset;
+    for (auto elem : arg)
+        chset.ranges.insert({elem, elem});
+    return Rule(chset);
 }
 
 Rule chset(std::wstring chset)

@@ -1,10 +1,11 @@
 #include "StateMachine.hpp"
+#include <iostream>
 #include <cassert>
 #include <deque>
 
 namespace
 {
-typedef std::pair<unsigned, unsigned> CharRange;
+typedef std::pair<uint64_t, uint64_t> CharRange;
 typedef std::set<CharRange> CharRanges;
 typedef std::pair<CharRanges, State*> Transition;
 typedef std::vector<Transition> Transitions;
@@ -38,6 +39,7 @@ AutomataUnderConstruction createOrAutomata(const Rule& rule)
     {
         endings.insert(endings.end(), automata.second.begin(), automata.second.end());
         start->transitions.push_back(Transition({}, automata.first));
+        if (automata.first == nullptr) endings.push_back(start);
     }
     return AutomataUnderConstruction(start, endings);
 }
@@ -46,6 +48,7 @@ AutomataUnderConstruction createRepeatAutomata(const Rule& rule)
     assert(rule.discriminator == Rule::Type::DRepeat);
     assert(rule.subrules.size() == 1);
     AutomataUnderConstruction subautomata = createAutomata(rule.subrules.front());
+    if (subautomata.first == nullptr) return subautomata;
     for (auto ending : subautomata.second)
     {
         Transition endingTransition = ending->transitions.front();
@@ -69,6 +72,7 @@ AutomataUnderConstruction createSeqAutomata(const Rule& rule)
     AutomataUnderConstruction prev = automatas.front();
     for (auto automataIt = automatas.begin() + 1; automataIt != automatas.end(); ++automataIt)
     {
+        if (automataIt->first == nullptr) continue;
         for (auto ending : prev.second)
             ending->transitions.front().second = automataIt->first;
         prev = *automataIt;
@@ -83,6 +87,10 @@ AutomataUnderConstruction createChsetAutomata(const Rule& rule)
     start->transitions.push_back({rule.chset.ranges, nullptr});
     return AutomataUnderConstruction(start, {start});
 }
+AutomataUnderConstruction createEmptyAutomata()
+{
+    return AutomataUnderConstruction(nullptr, {});
+}
 AutomataUnderConstruction createAutomata(const Rule& rule)
 {
     switch (rule.discriminator)
@@ -95,6 +103,8 @@ AutomataUnderConstruction createAutomata(const Rule& rule)
             return createRepeatAutomata(rule);
         case Rule::Type::DOrSeq:
             return createOrAutomata(rule);
+        case Rule::Type::DEmpty:
+            return createEmptyAutomata();
         default:
             return AutomataUnderConstruction(nullptr, {});
     }
@@ -106,12 +116,11 @@ namespace
 {
 typedef std::set<State*> StateSet;
 
-bool matches(const CharRanges& ranges, wchar_t c)
+bool matches(const CharRanges& ranges, uint64_t c)
 {
-    unsigned temp = c;
     for (auto range : ranges)
     {
-        if ((temp >= range.first) && (temp <= range.second))
+        if ((c >= range.first) && (c <= range.second))
             return true;
     }
     return false;
@@ -141,7 +150,7 @@ bool processEpsilonTransitions(StateSet& states)
     return matched;
 }
 
-bool process(StateSet& states, wchar_t c)
+bool process(StateSet& states, uint64_t c)
 {
     StateSet nextStates;
     bool matched = false;
@@ -173,7 +182,7 @@ StateMachine::StateMachine(const Rule& rule)
     processEpsilonTransitions(states);
 }
 
-bool StateMachine::process(wchar_t c)
+bool StateMachine::process(uint64_t c)
 {
     return ::process(states, c);
 }

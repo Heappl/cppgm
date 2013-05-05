@@ -11,7 +11,7 @@
 #include "EFundamentalType.h"
 
 // EndOfFile: synthetic "character" to represent the end of source file
-constexpr int EndOfFile = -1;
+constexpr uint64_t EndOfFile = -1;
 
 // See C++ standard 2.11 Identifiers and Appendix/Annex E.1
 extern const std::vector<std::pair<int, int>> AnnexE1_Allowed_RangesSorted;

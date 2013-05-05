@@ -10,7 +10,7 @@ class StateMachine
 public:
     StateMachine();
     StateMachine(const Rule& rule);
-    bool process(wchar_t c);
+    bool process(uint64_t c);
     bool foreverUnmatched();
 };
 

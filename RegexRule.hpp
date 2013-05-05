@@ -6,13 +6,14 @@
 #include <set>
 #include <string>
 #include <stdexcept>
+#include <limits>
 
-#define MIN_WCHAR 0u
-#define MAX_WCHAR 0xfffffffdu
+#define MAX_ANYCHAR (0xFFFFFFFF)
+#define MIN_ANYCHAR (0)
 
 struct Rule;
 typedef std::vector<Rule> Rules;
-typedef std::pair<unsigned, unsigned> CharRange;
+typedef std::pair<uint64_t, uint64_t> CharRange;
 typedef std::set<CharRange> CharRanges;
 
 struct RuleException : std::runtime_error
@@ -41,7 +42,8 @@ struct Rule
         DRepeat,
         DOrSeq,
         DSeq,
-        DChset
+        DChset,
+        DEmpty
     };
     Type discriminator;
     Rules subrules;
@@ -59,11 +61,14 @@ struct Rule
     Rule operator|(const Rule& other) const;
     Rule operator~() const;
     Rule operator-(const Rule& other) const;
+    Rule operator!() const;
 };
 
 Rule operator>>(const wchar_t* left, const Rule& right);
 Rule operator|(const wchar_t* left, const Rule& right);
 Rule chset(wchar_t c);
+Rule chset(uint64_t);
+Rule chset(std::vector<uint64_t>);
 Rule chset(std::wstring chset);
 extern Rule anychar;
 Rule chseq(std::wstring seq);
