@@ -45,7 +45,7 @@ bool isToBigOctal(const std::string& val)
 
 bool isToBigHex(const std::string& val)
 {
-    return false;
+    return (val.size() > 16);
 }
 
 bool isToBigDec(const std::string& val)
