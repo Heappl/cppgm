@@ -272,8 +272,25 @@ void PostTokenAnalyser::emit_character_literal(const string& data)
         output->emit_invalid(data);
 }
 
+template <typename Emitter>
+void emit_user_defined_char_array(const string& data, std::string quote, Emitter output)
+{
+    auto index = data.find_last_of(quote);
+    auto value = data.substr(1, index - 1);
+    auto suffix = data.substr(index + 1);
+    if (suffix.empty() || (suffix[0] != '_'))
+        output->emit_invalid(data);
+    else if (quote == "'")
+        output->emit_user_defined_literal_character(
+            data, suffix, FundamentalTypeOf<char>(), value.c_str(), value.size());
+    else
+        output->emit_user_defined_literal_string_array(
+            data, suffix, value.size() + 1, FundamentalTypeOf<char>(), value.c_str(), value.size() + 1);
+}
+
 void PostTokenAnalyser::emit_user_defined_character_literal(const string& data)
 {
+    emit_user_defined_char_array(data, "'", output);
 }
 
 template <typename T, typename Emitter>
@@ -377,6 +394,7 @@ void PostTokenAnalyser::emit_string_literal(const string& data)
 
 void PostTokenAnalyser::emit_user_defined_string_literal(const string& data)
 {
+    emit_user_defined_char_array(data, "\"", output);
 }
 
 void PostTokenAnalyser::emit_preprocessing_op_or_punc(const string& data)
