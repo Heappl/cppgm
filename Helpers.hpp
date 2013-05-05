@@ -10,6 +10,8 @@ int HexCharToValue(int c);
 // convert integer [0,15] to hexadecimal digit
 char ValueToHexChar(int c);
 
+std::string splitWideChar(wchar_t c);
+std::string toStr(int arg);
 std::string toStr(std::wstring arg);
 wchar_t toWideChar(int c);
 std::vector<std::pair<int, int>> convertToWide(std::vector<std::pair<int, int>> ranges);
@@ -22,7 +24,8 @@ std::string HexDump(const void* pdata, size_t nbytes);
 float PA2Decode_float(const std::string& s);
 double PA2Decode_double(const std::string& s);
 long double PA2Decode_long_double(const std::string& s);
-long long PA2Decode_long_long(const std::string& s, bool isHex,bool isOctet);
+long long PA2Decode_ll(const std::string& s, bool isHex,bool isOctet);
+long long PA2Decode_ull(const std::string& s, bool isHex,bool isOctet);
 
 #endif //HELPERS_HPP
 

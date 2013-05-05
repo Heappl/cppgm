@@ -65,6 +65,13 @@ std::string splitWideChar(wchar_t c)
     out.push_back(c);
     return out;
 }
+
+std::string toStr(int arg)
+{
+    std::string ret;
+    ret.push_back(char(arg));
+    return ret;
+}
 std::string toStr(std::wstring arg)
 {
     std::string out;
@@ -173,13 +180,23 @@ long double PA2Decode_long_double(const std::string& s)
 	return x;
 }
 
-long long PA2Decode_long_long(const std::string& s, bool isHex, bool isOctet)
+long long PA2Decode_ll(const std::string& s, bool isHex,bool isOctet)
 {
 	std::stringstream ss;
     if (isHex) ss << std::hex;
     if (isOctet) ss << std::oct;
     ss << s;
 	long long x;
+	ss >> x;
+	return x;
+}
+long long PA2Decode_ull(const std::string& s, bool isHex,bool isOctet)
+{
+	std::stringstream ss;
+    if (isHex) ss << std::hex;
+    if (isOctet) ss << std::oct;
+    ss << s;
+	unsigned long long x;
 	ss >> x;
 	return x;
 }
