@@ -86,7 +86,7 @@ int getTypeOfUtf8Char(int x)
     if (x >= 0x0080) return 2;
     return 1;
 }
-wchar_t toWideChar(int c)
+wchar_t toWideCharInUtf8(int c)
 {
     unsigned out = 0;
     if (c >= 0x010000)
@@ -120,23 +120,23 @@ std::vector<std::pair<int, int>> convertToWide(std::vector<std::pair<int, int>> 
         if (getTypeOfUtf8Char(elem.first) != getTypeOfUtf8Char(elem.second))
         {
             if (elem.second >= 0x010000)
-                out.push_back({toWideChar(0x010000), toWideChar(elem.second)});
+                out.push_back({toWideCharInUtf8(0x010000), toWideCharInUtf8(elem.second)});
             else if (elem.second >= 0x0800)
-                out.push_back({toWideChar(0x0800), toWideChar(elem.second)});
+                out.push_back({toWideCharInUtf8(0x0800), toWideCharInUtf8(elem.second)});
             else if (elem.second >= 0x0080)
-                out.push_back({toWideChar(0x0080), toWideChar(elem.second)});
+                out.push_back({toWideCharInUtf8(0x0080), toWideCharInUtf8(elem.second)});
             if (elem.first <= 0x00ffff)
-                out.push_back({toWideChar(elem.first), toWideChar(0x00ffff)});
+                out.push_back({toWideCharInUtf8(elem.first), toWideCharInUtf8(0x00ffff)});
             else if (elem.first <= 0x07ff)
-                out.push_back({toWideChar(elem.first), toWideChar(0x07ff)});
+                out.push_back({toWideCharInUtf8(elem.first), toWideCharInUtf8(0x07ff)});
             else if (elem.first <= 0x007f)
-                out.push_back({toWideChar(elem.first), toWideChar(0x007f)});
+                out.push_back({toWideCharInUtf8(elem.first), toWideCharInUtf8(0x007f)});
             if ((elem.first <= 0x007f) && (elem.second >= 0x0800))
-                out.push_back({toWideChar(0x0080), toWideChar(0x07ff)});
+                out.push_back({toWideCharInUtf8(0x0080), toWideCharInUtf8(0x07ff)});
             if ((elem.first <= 0x07ff) && (elem.second >= 0x010000))
-                out.push_back({toWideChar(0x0800), toWideChar(0x00ffff)});
+                out.push_back({toWideCharInUtf8(0x0800), toWideCharInUtf8(0x00ffff)});
         }
-        else out.push_back({toWideChar(elem.first), toWideChar(elem.second)});
+        else out.push_back({toWideCharInUtf8(elem.first), toWideCharInUtf8(elem.second)});
     }
     return out;
 }

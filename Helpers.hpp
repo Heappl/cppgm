@@ -13,7 +13,7 @@ char ValueToHexChar(int c);
 std::string splitWideChar(wchar_t c);
 std::string toStr(int arg);
 std::string toStr(std::wstring arg);
-wchar_t toWideChar(int c);
+wchar_t toWideCharInUtf8(int c);
 std::vector<std::pair<int, int>> convertToWide(std::vector<std::pair<int, int>> ranges);
 
 // hex dump memory range

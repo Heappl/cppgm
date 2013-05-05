@@ -1,4 +1,5 @@
 #include "RegexRule.hpp"
+#include <iostream>
 
 Chset::Chset(std::wstring chset)
 {
@@ -7,7 +8,7 @@ Chset::Chset(std::wstring chset)
     {
         CharRange range = {chset[index], chset[index]};
         index++;
-        if ((index < chset.size() - 1) && (chset[index] == '-'))
+        if ((index < chset.size() - 1) && (chset[index] == L'-'))
         {
             ++index;
             range.second = chset[index];

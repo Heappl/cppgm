@@ -140,7 +140,7 @@ void firstAndCommentPhaseLinker(FirstPhaseToken t, std::wstring text, Handler h)
         int aux = 0;
         for (unsigned i = 2; i < text.size(); ++i)
             aux = (aux << 4) + HexCharToValue(text[i]);
-        wchar_t c = toWideChar(aux);
+        wchar_t c = toWideCharInUtf8(aux);
         h(c, {c});
     }
     if (t == FirstPhaseToken::UniversalCharacter)
