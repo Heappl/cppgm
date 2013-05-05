@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <sstream>
 
 // given hex digit character c, return its value
 int HexCharToValue(int c);
@@ -21,11 +22,17 @@ std::string HexDump(const void* pdata, size_t nbytes);
 
 // use these 3 functions to scan `floating-literals` (see PA2)
 // for example PA2Decode_float("12.34") returns "12.34" as a `float` type
-float PA2Decode_float(const std::string& s);
-double PA2Decode_double(const std::string& s);
-long double PA2Decode_long_double(const std::string& s);
-long long PA2Decode_ll(const std::string& s, bool isHex,bool isOctet);
-long long PA2Decode_ull(const std::string& s, bool isHex,bool isOctet);
+template <typename T>
+T PA2Decode(const std::string& s, bool isHex = false, bool isOctet = false)
+{
+	std::stringstream ss;
+    if (isHex) ss << std::hex;
+    if (isOctet) ss << std::oct;
+    ss << s;
+	T x;
+	ss >> x;
+	return x;
+}
 
 #endif //HELPERS_HPP
 

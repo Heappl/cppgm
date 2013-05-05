@@ -83,15 +83,32 @@ void emitLiteral(const std::string& data, const string& val, bool isHex, bool is
     else if (val[0] == '-')
     {
         if (isUnsigned) output->emit_invalid(data);
-        else emitLiteral<T>(data, PA2Decode_ll(val, isHex, isOctet), false, output);
+        else emitLiteral<T>(data, PA2Decode<long long>(val, isHex, isOctet), false, output);
     }
-    else emitLiteral<T, unsigned long long int>(data, PA2Decode_ull(val, isHex, isOctet), isUnsigned, output);
+    else emitLiteral<T, unsigned long long int>(data, PA2Decode<unsigned long long>(val, isHex, isOctet), isUnsigned, output);
 }
-template <typename Emitter>
-void emitDoubleLiteral(const std::string& data, Emitter output)
+template <typename T, typename Emitter>
+void emitFloatLiteral(const std::string& data, Emitter output)
 {
-    double aux = PA2Decode_double(data);
-    output->emit_literal(data, EFundamentalType::FT_DOUBLE, &aux, sizeof(aux));
+    T aux = PA2Decode<T>(data);
+    output->emit_literal(data, FundamentalTypeOf<T>(), &aux, sizeof(aux));
+}
+
+template <typename Emitter>
+void emitUserDefinedNumber(
+    const std::string& data,
+    const std::string& prefix,
+    const std::string& suffix,
+    bool isOctet,
+    bool isHex,
+    bool isFloat,
+    Emitter output)
+{
+    auto index = suffix.find('_');
+    std::string userSuffix = suffix.substr(index);
+    std::string value = (isHex ? "0x" : (isOctet ? "0" : "")) + prefix + suffix.substr(0, index);
+    if (isFloat) output->emit_user_defined_literal_floating(data, userSuffix, value);
+    else output->emit_user_defined_literal_integer(data, userSuffix, value);
 }
 
 void PostTokenAnalyser::emit_pp_number(const string& data)
@@ -122,6 +139,7 @@ void PostTokenAnalyser::emit_pp_number(const string& data)
     auto unsignedLongLongSuffix = (chset(L"Uu") >> longLongSuffix) | (longLongSuffix >> chset(L"Uu"));
     auto userDefinedSuffix = L"_" >> +anychar;
     auto eNotation = chset(L"eE") >> ((chset(L"+-") >> +chset(L"0-9")) | +chset(L"0-9"));
+    auto floatSuffix = chset(L"fF") | (eNotation >> chset(L"fF"));
 
     auto dots = std::count(prefix.begin(), prefix.end(), '.');
 
@@ -140,13 +158,21 @@ void PostTokenAnalyser::emit_pp_number(const string& data)
         else if (matches(unsignedLongLongSuffix, suffix))
             emitLiteral<unsigned long long int>(data, value, isHex, isOctet, true, output);
         else if (matches(eNotation, suffix))
-            emitDoubleLiteral(data, output);
+            emitFloatLiteral<double>(data, output);
+        else if (matches(floatSuffix, suffix))
+            emitFloatLiteral<float>(data, output);
         else if (matches(userDefinedSuffix, suffix))
-            output->emit_user_defined_literal_integer(data, suffix, (isHex ? "0x" : (isOctet ? "0" : "")) + prefix);
+            emitUserDefinedNumber(data, prefix, suffix, isOctet, isHex, false, output);
+        else if (matches(eNotation >> userDefinedSuffix, suffix))
+            emitUserDefinedNumber(data, prefix, suffix, isOctet, isHex, true, output);
         else output->emit_invalid(data);
     }
     else if ((dots < 2) && (suffix.empty() || matches(eNotation, suffix)))
-        emitDoubleLiteral(data, output);
+        emitFloatLiteral<double>(data, output);
+    else if ((dots < 2) && matches(floatSuffix, suffix))
+        emitFloatLiteral<float>(data, output);
+    else if (matches(userDefinedSuffix | (eNotation >> userDefinedSuffix), suffix))
+        emitUserDefinedNumber(data, prefix, suffix, isOctet, isHex, true, output);
     else output->emit_invalid(data);
 }
 
