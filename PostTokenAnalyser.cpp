@@ -350,12 +350,12 @@ template <typename CharType>
 std::vector<char> convertEscapeSeqs(const std::string arg, StringCoding coding)
 {
     enum Token { Esc, Char, EoS, Utf8Char };
-    typedef std::function<void (wchar_t, std::wstring)> Handler;
-    typedef std::function<void(wchar_t, std::wstring, Handler)> InitialLinker;
+    typedef std::function<void (uint64_t, std::wstring)> Handler;
+    typedef std::function<void(uint64_t, std::wstring, Handler)> InitialLinker;
     typedef std::vector<std::pair<Token, Rule>> Definitions;
-    typedef TokenizerChain<TokenizerChainLinkType<wchar_t, wchar_t, Token>> Tokenizer;
+    typedef TokenizerChain<TokenizerChainLinkType<uint64_t, uint64_t, Token>> Tokenizer;
 
-    wchar_t EndOfString = wchar_t(-1);
+    uint64_t EndOfString = -1;
 
     std::vector<char> out;
     auto tokenHandler = [&](Token token, std::wstring val)
@@ -391,7 +391,7 @@ std::vector<char> convertEscapeSeqs(const std::string arg, StringCoding coding)
                 }
             }
         };
-    InitialLinker initialLinker = [](wchar_t c, std::wstring text, Handler h) { h(c, text); };
+    InitialLinker initialLinker = [](uint64_t c, std::wstring text, Handler h) { h(c, text); };
 
     auto hex = L"\\x" >> +chset(L"0-9a-fA-F");
     auto octDig = chset(L"0-7");
@@ -410,8 +410,8 @@ std::vector<char> convertEscapeSeqs(const std::string arg, StringCoding coding)
              {Char, anychar},
              {EoS, end}
             }));
-    for (auto c : arg) tokenizer.handler(wchar_t(c), {wchar_t(c)});
-    tokenizer.handler(EndOfString, {EndOfString});
+    for (auto c : arg) tokenizer.handler(wcharToUint64(c), {wchar_t(c)});
+    tokenizer.handler(EndOfString, {wchar_t(EndOfString)});
     return out;
 }
 
