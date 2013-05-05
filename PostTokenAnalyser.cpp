@@ -48,20 +48,30 @@ bool isToBigHex(const std::string& val)
     return (val.size() > 16);
 }
 
-bool isToBigDec(const std::string& val)
+bool isToBigDec(const std::string& val, bool isUnsigned)
 {
+    if (val.size() > 20) return true;
+    if (not isUnsigned && (val.size() > 19)) return true;
+    if (val.size() < 19) return false;
+    if (not isUnsigned && (val.size() == 19)) return (val >= "9223372036854775808");
+    if (val.size() == 20) return (val >= "18446744073709551616");
     return false;
 }
 
 template <typename T, typename ValueType, typename Emitter>
-void emitLiteral(const std::string& data, ValueType value, bool isUnsigned, Emitter output)
+void emitIntLiteral(const std::string& data, ValueType value, bool isUnsigned, bool isDec, Emitter output)
 {
     if (value > ValueType(std::numeric_limits<T>::max()))
     {
         if (isUnsigned)
-            emitLiteral<typename NumericProgression<T>::top_unsigned_type, ValueType>(data, value, isUnsigned, output);
+            emitIntLiteral<typename NumericProgression<T>::top_unsigned_type, ValueType>(
+                data, value, isUnsigned, isDec, output);
+        else if (isDec)
+            emitIntLiteral<typename NumericProgression<T>::top_dec_type, ValueType>(
+                data, value, isUnsigned, isDec, output);
         else
-            emitLiteral<typename NumericProgression<T>::top_type, ValueType>(data, value, isUnsigned, output);
+            emitIntLiteral<typename NumericProgression<T>::top_type, ValueType>(
+                data, value, isUnsigned, isDec, output);
     }
     //else if (value < std::numeric_limits<T>::min())
         //emitLiteral<typename NumericProgression<T>::bottom_type, ValueType>(data, value, isUnsigned, output);
@@ -73,9 +83,10 @@ void emitLiteral(const std::string& data, ValueType value, bool isUnsigned, Emit
 }
 
 template <typename T, typename Emitter>
-void emitLiteral(const std::string& data, const string& val, bool isHex, bool isOctet, bool isUnsigned, Emitter output)
+void emitIntLiteral(const std::string& data, const string& val, bool isHex, bool isOctet, bool isUnsigned, Emitter output)
 {
-    if ((isOctet && isToBigOctal(val)) || (isHex && isToBigHex(val)) || (isToBigDec(val)))
+    bool isDec = not isOctet && not isHex;
+    if ((isOctet && isToBigOctal(val)) || (isHex && isToBigHex(val)) || (isDec && isToBigDec(val, isUnsigned)))
     {
         output->emit_invalid(data);
         return;
@@ -83,9 +94,10 @@ void emitLiteral(const std::string& data, const string& val, bool isHex, bool is
     else if (val[0] == '-')
     {
         if (isUnsigned) output->emit_invalid(data);
-        else emitLiteral<T>(data, PA2Decode<long long>(val, isHex, isOctet), false, output);
+        else emitIntLiteral<T>(data, PA2Decode<long long>(val, isHex, isOctet), false, isDec, output);
     }
-    else emitLiteral<T, unsigned long long int>(data, PA2Decode<unsigned long long>(val, isHex, isOctet), isUnsigned, output);
+    else emitIntLiteral<T, unsigned long long int>(
+        data, PA2Decode<unsigned long long>(val, isHex, isOctet), isUnsigned, isDec, output);
 }
 template <typename T, typename Emitter>
 void emitFloatLiteral(const std::string& data, Emitter output)
@@ -146,17 +158,17 @@ void PostTokenAnalyser::emit_pp_number(const string& data)
     if (dots == 0)
     {
         if (suffix.empty())
-            emitLiteral<int>(data, value, isHex, isOctet, isUnsigned, output);
+            emitIntLiteral<int>(data, value, isHex, isOctet, isUnsigned, output);
         else if (matches(longSuffix, suffix))
-            emitLiteral<long int>(data, value, isHex, isOctet, isUnsigned, output);
+            emitIntLiteral<long int>(data, value, isHex, isOctet, isUnsigned, output);
         else if (matches(longLongSuffix, suffix))
-            emitLiteral<long long int>(data, value, isHex, isOctet, isUnsigned, output);
+            emitIntLiteral<long long int>(data, value, isHex, isOctet, isUnsigned, output);
         else if (matches(unsignedSuffix, suffix))
-            emitLiteral<unsigned int>(data, value, isHex, isOctet, true, output);
+            emitIntLiteral<unsigned int>(data, value, isHex, isOctet, true, output);
         else if (matches(unsignedLongSuffix, suffix))
-            emitLiteral<unsigned long int>(data, value, isHex, isOctet, true, output);
+            emitIntLiteral<unsigned long int>(data, value, isHex, isOctet, true, output);
         else if (matches(unsignedLongLongSuffix, suffix))
-            emitLiteral<unsigned long long int>(data, value, isHex, isOctet, true, output);
+            emitIntLiteral<unsigned long long int>(data, value, isHex, isOctet, true, output);
         else if (matches(eNotation, suffix))
             emitFloatLiteral<double>(data, output);
         else if (matches(floatSuffix, suffix))

@@ -63,6 +63,7 @@ template <typename T>
 struct NumericProgression
 {
     typedef T top_type;
+    typedef T top_dec_type;
     typedef T top_unsigned_type;
     typedef T bottom_type;
 };
@@ -71,6 +72,7 @@ template <>
 struct NumericProgression<int>
 {
     typedef unsigned int top_type;
+    typedef long int top_dec_type;
     typedef unsigned int top_unsigned_type;
     typedef long int bottom_type;
 };
@@ -79,6 +81,7 @@ template <>
 struct NumericProgression<unsigned int>
 {
     typedef long int top_type;
+    typedef long int top_dec_type;
     typedef unsigned long int top_unsigned_type;
     typedef int bottom_type;
 };
@@ -87,6 +90,7 @@ template <>
 struct NumericProgression<long int>
 {
     typedef unsigned long int top_type;
+    typedef long long int top_dec_type;
     typedef unsigned long int top_unsigned_type;
     typedef long long int bottom_type;
 };
@@ -95,6 +99,7 @@ template <>
 struct NumericProgression<unsigned long int>
 {
     typedef long long int top_type;
+    typedef long long int top_dec_type;
     typedef unsigned long long int top_unsigned_type;
     typedef int bottom_type;
 };
@@ -103,6 +108,7 @@ template <>
 struct NumericProgression<long long int>
 {
     typedef unsigned long long int top_type;
+    typedef long long int top_dec_type;
     typedef unsigned long long int top_unsigned_type;
     typedef long long int bottom_type;
 };
@@ -110,6 +116,7 @@ struct NumericProgression<long long int>
 template <>
 struct NumericProgression<unsigned long long int>
 {
+    typedef unsigned long long int top_dec_type;
     typedef unsigned long long int top_type;
     typedef unsigned long long int top_unsigned_type;
     typedef int bottom_type;
