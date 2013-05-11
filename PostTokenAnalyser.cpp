@@ -347,7 +347,8 @@ std::string fillCharType(unsigned size, std::string arg)
 }
 
 template <typename CharType>
-std::vector<char> convertEscapeSeqs(const std::string arg, StringCoding coding)
+std::vector<char> codeAndOptionallyConvertEscapeSeqs(
+    const std::string arg, StringCoding coding, bool doNotConvertEscapeSeqs)
 {
     enum Token { Esc, Char, EoS, Utf8Char };
     typedef std::function<void (uint64_t, std::wstring)> Handler;
@@ -360,26 +361,20 @@ std::vector<char> convertEscapeSeqs(const std::string arg, StringCoding coding)
     std::vector<char> out;
     auto tokenHandler = [&](Token token, std::wstring val)
         {
-            std::string temp;
-            std::string aux(val.begin(), val.end());
-            if (token == Esc) temp = convertEscapeSeq(std::string(val.begin(), val.end()), coding);
+            std::string temp(val.begin(), val.end());
+            if (token == Esc) temp = convertEscapeSeq(temp, coding);
             else if (token == Utf8Char)
             {
-                if (coding == StringCoding::Utf8) temp = aux;
-                else if (coding == StringCoding::Utf16)
+                if (coding == StringCoding::Utf16)
                 {
-                    auto converted = utf8toInt(aux);
+                    auto converted = utf8toInt(temp);
                     temp = toUtf16(converted);
                 }
                 else if (coding == StringCoding::Utf32)
                 {
-                    auto converted = utf8toInt(aux);
+                    auto converted = utf8toInt(temp);
                     temp = std::string((char*)&converted, (char*)&converted + sizeof(converted));
                 }
-            }
-            else
-            {
-                temp = aux;
             }
             if (token != EoS)
             {
@@ -401,15 +396,9 @@ std::vector<char> convertEscapeSeqs(const std::string arg, StringCoding coding)
     auto escChar = L"\\" >> anychar;
     auto end = chset(EndOfString);
 
-    auto tokenizer = Tokenizer(
-        tokenHandler,
-        std::pair<InitialLinker, Definitions>(
-            initialLinker,
-            {{Esc, hex | oct | escChar },
-             {Utf8Char, utf8char},
-             {Char, anychar},
-             {EoS, end}
-            }));
+    Definitions defs = {{Utf8Char, utf8char}, {Char, anychar}, {EoS, end}};
+    if (not doNotConvertEscapeSeqs) defs.push_back({Esc, hex | oct | escChar});
+    auto tokenizer = Tokenizer(tokenHandler, std::pair<InitialLinker, Definitions>(initialLinker, defs));
     for (auto c : arg) tokenizer.handler(wcharToUint64(c), {wchar_t(c)});
     tokenizer.handler(EndOfString, {wchar_t(EndOfString)});
     return out;
@@ -420,14 +409,26 @@ void PostTokenAnalyser::emit_string_literal(const string& data)
     auto index = data.find('"');
     std::string prefix = data.substr(0, index);
     std::string value = data.substr(index + 1, data.size() - index - 2);
+    bool isRaw = false;
+    if (not prefix.empty() && (prefix[prefix.size() - 1] == 'R'))
+    {
+        prefix = prefix.substr(0, prefix.size() - 1);
+        index = value.find('(');
+        value = value.substr(index + 1, value.size() - 2 * index - 2); 
+        isRaw = true;
+    }
     if ((prefix == "u8") || (prefix.empty()))
-        emitLiteralArray<char>(data, convertEscapeSeqs<char>(value, StringCoding::Utf8), output);
+        emitLiteralArray<char>(
+            data, codeAndOptionallyConvertEscapeSeqs<char>(value, StringCoding::Utf8, isRaw), output);
     else if (prefix == "u")
-        emitLiteralArray<char16_t>(data, convertEscapeSeqs<char16_t>(value, StringCoding::Utf16), output);
+        emitLiteralArray<char16_t>(
+            data, codeAndOptionallyConvertEscapeSeqs<char16_t>(value, StringCoding::Utf16, isRaw), output);
     else if (prefix == "U")
-        emitLiteralArray<char32_t>(data, convertEscapeSeqs<char32_t>(value, StringCoding::Utf32), output);
+        emitLiteralArray<char32_t>(
+            data, codeAndOptionallyConvertEscapeSeqs<char32_t>(value, StringCoding::Utf32, isRaw), output);
     else if (prefix == "L")
-        emitLiteralArray<wchar_t>(data, convertEscapeSeqs<wchar_t>(value, StringCoding::Utf32), output);
+        emitLiteralArray<wchar_t>(
+            data, codeAndOptionallyConvertEscapeSeqs<wchar_t>(value, StringCoding::Utf32, isRaw), output);
 }
 
 void PostTokenAnalyser::emit_user_defined_string_literal(const string& data)
