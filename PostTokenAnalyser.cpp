@@ -8,8 +8,117 @@
 #include <algorithm>
 #include <iostream>
 
+struct StringConcatenator : IPostTokenStream
+{
+    std::shared_ptr<IPostTokenStream> output;
+    std::string buffSource;
+    unsigned buffSourceSize;
+    EFundamentalType buffType;
+    std::vector<char> buffData;
+
+    StringConcatenator(std::shared_ptr<IPostTokenStream> output) : output(output), buffSourceSize(0) {}
+
+    void flush()
+    {
+        for (unsigned i = 0; i < getSizeOfElementOfType(buffType); ++i) buffData.push_back('\0');
+        if (not buffSource.empty())
+            output->emit_literal_array(
+                buffSource,
+                buffSourceSize + 1,
+                buffType,
+                &buffData.front(),
+                buffData.size());
+        buffSource = "";
+        buffType = FundamentalTypeOf<char>();
+        buffData.clear();
+        buffSourceSize = 0;
+    }
+
+    unsigned getSizeOfElementOfType(EFundamentalType type)
+    {
+        if (type == FundamentalTypeOf<char>()) return sizeof(char);
+        if (type == FundamentalTypeOf<char16_t>()) return sizeof(char16_t);
+        if (type == FundamentalTypeOf<char32_t>()) return sizeof(char32_t);
+        if (type == FundamentalTypeOf<wchar_t>()) return sizeof(wchar_t);
+        return -1;
+    }
+
+	virtual void emit_literal_array(
+        const std::string& source, size_t num_elements, EFundamentalType type, const void* data, size_t nbytes)
+    {
+        buffSource += (buffSource.empty() ? "" : " ") + source;
+        buffType = type;
+        buffData.insert(buffData.end(), (char*)data, (char*)data + nbytes - getSizeOfElementOfType(type));
+        buffSourceSize += num_elements - 1;
+    }
+
+	virtual void emit_invalid(const std::string& source)
+    {
+        flush();
+        output->emit_invalid(source);
+    }
+
+	virtual void emit_simple(const std::string& source, ETokenType token_type)
+    {
+        flush();
+        output->emit_simple(source, token_type);
+    }
+
+	virtual void emit_identifier(const std::string& source)
+    {
+        flush();
+        output->emit_identifier(source);
+    }
+
+	virtual void emit_literal(
+        const std::string& source, EFundamentalType type, const void* data, size_t nbytes)
+    {
+        flush();
+        output->emit_literal(source, type, data, nbytes);
+    }
+
+	virtual void emit_user_defined_literal_character(
+        const std::string& source, const std::string& ud_suffix, EFundamentalType type, const void* data, size_t nbytes)
+    {
+        flush();
+        output->emit_user_defined_literal_character(source, ud_suffix, type, data, nbytes);
+    }
+
+	virtual void emit_user_defined_literal_string_array(
+        const std::string& source,
+        const std::string& ud_suffix,
+        size_t num_elements,
+        EFundamentalType type,
+        const void* data,
+        size_t nbytes)
+    {
+        flush();
+        output->emit_user_defined_literal_string_array(source, ud_suffix, num_elements, type, data, nbytes);
+    }
+
+	virtual void emit_user_defined_literal_integer(
+        const std::string& source, const std::string& ud_suffix, const std::string& prefix)
+    {
+        flush();
+        output->emit_user_defined_literal_integer(source, ud_suffix, prefix);
+    }
+
+	virtual void emit_user_defined_literal_floating(
+        const std::string& source, const std::string& ud_suffix, const std::string& prefix)
+    {
+        flush();
+        output->emit_user_defined_literal_floating(source, ud_suffix, prefix);
+    }
+
+	virtual void emit_eof()
+    {
+        flush();
+        output->emit_eof();
+    }
+};
+
 PostTokenAnalyser::PostTokenAnalyser(std::shared_ptr<IPostTokenStream> output)
-    : output(output)
+    : output(std::make_shared<StringConcatenator>(output))
 {
 }
 
@@ -25,6 +134,7 @@ void PostTokenAnalyser::emit_new_line()
 
 void PostTokenAnalyser::emit_header_name(const string& data)
 {
+    //ignoring
 }
 
 void PostTokenAnalyser::emit_identifier(const string& data)
