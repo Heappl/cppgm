@@ -7,6 +7,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <cassert>
 
 struct StringConcatenator : IPostTokenStream
 {
@@ -16,7 +17,8 @@ struct StringConcatenator : IPostTokenStream
     EFundamentalType buffType;
     std::vector<char> buffData;
 
-    StringConcatenator(std::shared_ptr<IPostTokenStream> output) : output(output), buffSourceSize(0) {}
+    StringConcatenator(std::shared_ptr<IPostTokenStream> output) :
+        output(output), buffSourceSize(0), buffType(FundamentalTypeOf<char>()) {}
 
     void flush()
     {
@@ -40,7 +42,7 @@ struct StringConcatenator : IPostTokenStream
         if (type == FundamentalTypeOf<char16_t>()) return sizeof(char16_t);
         if (type == FundamentalTypeOf<char32_t>()) return sizeof(char32_t);
         if (type == FundamentalTypeOf<wchar_t>()) return sizeof(wchar_t);
-        return -1;
+        assert(!"invalid type");
     }
 
 	virtual void emit_literal_array(
@@ -259,7 +261,7 @@ void PostTokenAnalyser::emit_pp_number(const string& data)
     auto unsignedSuffix = chset(L"uU");
     auto unsignedLongSuffix = (chset(L"Uu") >> chset(L"lL")) | (chset(L"lL") >> chset(L"Uu"));
     auto unsignedLongLongSuffix = (chset(L"Uu") >> longLongSuffix) | (longLongSuffix >> chset(L"Uu"));
-    auto userDefinedSuffix = L"_" >> +anychar;
+    auto userDefinedSuffix = L"_" >> chset(L"a-zA-Z") >> *chset(L"a-zA-Z0-9_");
     auto eNotation = chset(L"eE") >> ((chset(L"+-") >> +chset(L"0-9")) | +chset(L"0-9"));
     auto floatSuffix = chset(L"fF") | (eNotation >> chset(L"fF"));
 
