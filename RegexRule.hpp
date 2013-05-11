@@ -1,5 +1,4 @@
-#ifndef REGEX_RULE_HPP
-#define REGEX_RULE_HPP
+#pragma once
 
 #include <vector>
 #include <utility>
@@ -74,6 +73,4 @@ extern Rule anychar;
 Rule chseq(std::wstring seq);
 Rule strset(std::vector<std::wstring> strs);
 Rule chsetFromRanges(std::vector<std::pair<int, int>> ranges);
-
-#endif //REGEX_RULE_HPP
 

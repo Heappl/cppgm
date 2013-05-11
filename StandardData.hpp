@@ -1,5 +1,4 @@
-#ifndef STANDARD_DATA_HPP
-#define STANDARD_DATA_HPP
+#pragma once
 
 #include <vector>
 #include <unordered_set>
@@ -121,6 +120,4 @@ struct NumericProgression<unsigned long long int>
     typedef unsigned long long int top_unsigned_type;
     typedef int bottom_type;
 };
-
-#endif //STANDARD_DATA_HPP
 

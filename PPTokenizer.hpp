@@ -1,5 +1,4 @@
-#ifndef PPTOKENIZER_HPP
-#define PPTOKENIZER_HPP
+#pragma once
 
 #include "IPPTokenStream.h"
 #include <memory>
@@ -25,8 +24,4 @@ public:
 	PPTokenizer(std::shared_ptr<IPPTokenStream> output);
 	void process(uint64_t c);
 };
-
-
-
-#endif //PPTOKENIZER_HPP
 

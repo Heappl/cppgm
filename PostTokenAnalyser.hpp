@@ -2,11 +2,13 @@
 
 #include "IPPTokenStream.h"
 #include "IPostTokenStream.h"
+#include "StringLiteralsPostTokenProcessor.hpp"
 #include <memory>
 
 class PostTokenAnalyser : public IPPTokenStream
 {
     std::shared_ptr<IPostTokenStream> output;
+    std::shared_ptr<StringLiteralsPostTokenProcessor> stringProcessor;
 public:
     PostTokenAnalyser(std::shared_ptr<IPostTokenStream> output);
 

@@ -10,6 +10,7 @@ units = \
 	RegexRule \
 	StandardData \
 	StateMachine \
+	StringLiteralsPostTokenProcessor \
 	PostTokenAnalyser
 
 all: $(apps)

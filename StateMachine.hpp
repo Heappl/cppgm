@@ -1,5 +1,4 @@
-#ifndef STATE_MACHINE_HPP
-#define STATE_MACHINE_HPP
+#pragma once
 
 #include "RegexRule.hpp"
 
@@ -16,6 +15,4 @@ public:
 
 bool matches(const Rule& rule, std::wstring str);
 bool matches(const Rule& rule, std::string str);
-
-#endif //STATE_MACHINE_HPP
 

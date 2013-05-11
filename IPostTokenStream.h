@@ -2,6 +2,7 @@
 
 #include "ETokenType.h"
 #include "EFundamentalType.h"
+#include <string>
 
 struct IPostTokenStream
 {

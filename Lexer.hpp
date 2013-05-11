@@ -3,6 +3,7 @@
 
 #include "StateMachine.hpp"
 #include "RegexRule.hpp"
+#include <map>
 
 struct InvalidChar : std::runtime_error
 {

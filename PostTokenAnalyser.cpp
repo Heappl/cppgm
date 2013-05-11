@@ -3,150 +3,13 @@
 #include "Helpers.hpp"
 #include "RegexRule.hpp"
 #include "StateMachine.hpp"
-#include "Lexer.hpp"
 #include <vector>
 #include <algorithm>
 #include <iostream>
 #include <cassert>
 
-struct StringConcatenator : IPostTokenStream
+namespace
 {
-    std::shared_ptr<IPostTokenStream> output;
-    std::string buffSource;
-    unsigned buffSourceSize;
-    EFundamentalType buffType;
-    std::vector<char> buffData;
-
-    StringConcatenator(std::shared_ptr<IPostTokenStream> output) :
-        output(output), buffSourceSize(0), buffType(FundamentalTypeOf<char>()) {}
-
-    void flush()
-    {
-        for (unsigned i = 0; i < getSizeOfElementOfType(buffType); ++i) buffData.push_back('\0');
-        if (not buffSource.empty())
-            output->emit_literal_array(
-                buffSource,
-                buffSourceSize + 1,
-                buffType,
-                &buffData.front(),
-                buffData.size());
-        buffSource = "";
-        buffType = FundamentalTypeOf<char>();
-        buffData.clear();
-        buffSourceSize = 0;
-    }
-
-    unsigned getSizeOfElementOfType(EFundamentalType type)
-    {
-        if (type == FundamentalTypeOf<char>()) return sizeof(char);
-        if (type == FundamentalTypeOf<char16_t>()) return sizeof(char16_t);
-        if (type == FundamentalTypeOf<char32_t>()) return sizeof(char32_t);
-        if (type == FundamentalTypeOf<wchar_t>()) return sizeof(wchar_t);
-        assert(!"invalid type");
-    }
-
-	virtual void emit_literal_array(
-        const std::string& source, size_t num_elements, EFundamentalType type, const void* data, size_t nbytes)
-    {
-        buffSource += (buffSource.empty() ? "" : " ") + source;
-        buffType = type;
-        buffData.insert(buffData.end(), (char*)data, (char*)data + nbytes - getSizeOfElementOfType(type));
-        buffSourceSize += num_elements - 1;
-    }
-
-	virtual void emit_invalid(const std::string& source)
-    {
-        flush();
-        output->emit_invalid(source);
-    }
-
-	virtual void emit_simple(const std::string& source, ETokenType token_type)
-    {
-        flush();
-        output->emit_simple(source, token_type);
-    }
-
-	virtual void emit_identifier(const std::string& source)
-    {
-        flush();
-        output->emit_identifier(source);
-    }
-
-	virtual void emit_literal(
-        const std::string& source, EFundamentalType type, const void* data, size_t nbytes)
-    {
-        flush();
-        output->emit_literal(source, type, data, nbytes);
-    }
-
-	virtual void emit_user_defined_literal_character(
-        const std::string& source, const std::string& ud_suffix, EFundamentalType type, const void* data, size_t nbytes)
-    {
-        flush();
-        output->emit_user_defined_literal_character(source, ud_suffix, type, data, nbytes);
-    }
-
-	virtual void emit_user_defined_literal_string_array(
-        const std::string& source,
-        const std::string& ud_suffix,
-        size_t num_elements,
-        EFundamentalType type,
-        const void* data,
-        size_t nbytes)
-    {
-        flush();
-        output->emit_user_defined_literal_string_array(source, ud_suffix, num_elements, type, data, nbytes);
-    }
-
-	virtual void emit_user_defined_literal_integer(
-        const std::string& source, const std::string& ud_suffix, const std::string& prefix)
-    {
-        flush();
-        output->emit_user_defined_literal_integer(source, ud_suffix, prefix);
-    }
-
-	virtual void emit_user_defined_literal_floating(
-        const std::string& source, const std::string& ud_suffix, const std::string& prefix)
-    {
-        flush();
-        output->emit_user_defined_literal_floating(source, ud_suffix, prefix);
-    }
-
-	virtual void emit_eof()
-    {
-        flush();
-        output->emit_eof();
-    }
-};
-
-PostTokenAnalyser::PostTokenAnalyser(std::shared_ptr<IPostTokenStream> output)
-    : output(std::make_shared<StringConcatenator>(output))
-{
-}
-
-void PostTokenAnalyser::emit_whitespace_sequence()
-{
-    //ignoring
-}
-
-void PostTokenAnalyser::emit_new_line()
-{
-    //ignoring
-}
-
-void PostTokenAnalyser::emit_header_name(const string& data)
-{
-    //ignoring
-}
-
-void PostTokenAnalyser::emit_identifier(const string& data)
-{
-    auto it = StringToTokenTypeMap.find(data);
-    if (it != StringToTokenTypeMap.end())
-        output->emit_simple(data, it->second);
-    else
-        output->emit_identifier(data);
-}
 
 bool isToBigOctal(const std::string& val)
 {
@@ -235,8 +98,41 @@ void emitUserDefinedNumber(
     else output->emit_user_defined_literal_integer(data, userSuffix, value);
 }
 
+} //namespace
+
+PostTokenAnalyser::PostTokenAnalyser(std::shared_ptr<IPostTokenStream> output)
+    : output(output), stringProcessor(new StringLiteralsPostTokenProcessor(output))
+{
+}
+
+void PostTokenAnalyser::emit_whitespace_sequence()
+{
+    //ignoring
+}
+
+void PostTokenAnalyser::emit_new_line()
+{
+    //ignoring
+}
+
+void PostTokenAnalyser::emit_header_name(const string& data)
+{
+    //ignoring
+}
+
+void PostTokenAnalyser::emit_identifier(const string& data)
+{
+    stringProcessor->flush();
+    auto it = StringToTokenTypeMap.find(data);
+    if (it != StringToTokenTypeMap.end())
+        output->emit_simple(data, it->second);
+    else
+        output->emit_identifier(data);
+}
+
 void PostTokenAnalyser::emit_pp_number(const string& data)
 {
+    stringProcessor->flush();
     auto auxData = data;
     auto isHex = (auxData.substr(0, 2) == "0x");
     auto isOctet = (not isHex && (auxData[0] == '0') && (auxData.size() > 1)
@@ -300,100 +196,9 @@ void PostTokenAnalyser::emit_pp_number(const string& data)
     else output->emit_invalid(data);
 }
 
-unsigned toInt(char c)
-{
-    return unsigned(c) & 0xff;
-}
-bool checkIfUtf8(const string& str)
-{
-    for (unsigned i = 1; i < str.size(); ++i)
-        if ((str[i] & 0xc0) != 0x80) return false;
-    if (str.size() == 4) return (str[0] & 0xf0) == 0xf0;
-    if (str.size() == 3) return (str[0] & 0xf0) == 0xe0;
-    if (str.size() == 2) return (str[0] & 0xf0) == 0xc0;
-    if (str.size() == 2) return (str[0] & 0xf0) == 0xc0;
-    if (str.size() == 1) return str[0] < 128;
-    return false;
-}
-unsigned utf8toInt(const string& str)
-{
-    if (str.size() == 4)
-    {
-        return
-            ((toInt(str[0]) - 0xf0) << 18)
-            + ((toInt(str[1]) - 0x80) << 12)
-            + ((toInt(str[2]) - 0x80) << 6)
-            + ((toInt(str[3]) - 0x80) << 0);
-    }
-    if (str.size() == 3)
-    {
-        return
-            ((toInt(str[0]) - 0xe0) << 12)
-            + ((toInt(str[1]) - 0x80) << 6)
-            + ((toInt(str[2]) - 0x80) << 0);
-    }
-    if (str.size() == 2)
-    {
-        return
-            ((toInt(str[0]) - 0xc0) << 6)
-            + ((toInt(str[1]) - 0x80) << 0);
-    }
-    return toInt(str[0]);
-}
-
-enum class StringCoding
-{
-    Utf8, Utf16, Utf32
-};
-
-std::string toUtf16(uint32_t arg)
-{
-    if (arg < 0x10000) return std::string((char*)&arg, (char*)&arg + 2);
-    arg -= 0x10000;
-    uint32_t aux = (0xD800 + ((arg >> 10) & 0x3FF)) + ((0xDC00 + (arg & 0x3FF)) << 16);
-    return std::string((char*)&aux, (char*)&aux + 4);
-}
-
-std::string convertEscapeSeq(std::string arg, StringCoding coding)
-{
-    if (arg.empty()) return "";
-    if (arg[0] != '\\') return arg;
-    if (arg.size() == 1) return "";
-    if (arg.size() == 2)
-    {
-        if (arg[1] == 'a') return toStr(0x07);
-        if (arg[1] == 'b') return toStr(0x08);
-        if (arg[1] == 'f') return toStr(0x0c);
-        if (arg[1] == 'n') return toStr(0x0a);
-        if (arg[1] == 'r') return toStr(0x0d);
-        if (arg[1] == 't') return toStr(0x09);
-        if (arg[1] == 'v') return toStr(0x0b);
-        if ((arg[1] == '\'') || (arg[1] == '\"') || (arg[1] == '\?') || (arg[1] == '\\'))
-            return arg.substr(1);
-        if ((arg[1] >= '0') && (arg[1] <= '7')) return toStr(int(arg[1] - '0'));
-        return "";
-    }
-    else if ((arg[1] == 'x') && (arg.size() < 10) && (matches(+chset(L"0-9a-fA-F"), arg.substr(2))))
-    {
-        uint32_t aux = 0;
-        for (auto c : arg.substr(2)) aux = (aux << 4) + HexCharToValue(c);
-        if (coding == StringCoding::Utf8) return splitWideChar(toWideCharInUtf8(aux));
-        else if (coding == StringCoding::Utf16) return toUtf16(aux);
-        else if (coding == StringCoding::Utf32) return std::string((char*)&aux, (char*)&aux + sizeof(aux));
-    }
-    else if ((arg.size() < 17) && matches(+chset(L"0-7"), arg.substr(1)))
-    {
-        uint32_t aux = 0;
-        for (auto c : arg.substr(1)) aux = (aux << 3) + int(c - '0');
-        if (coding == StringCoding::Utf8) return splitWideChar(toWideCharInUtf8(aux));
-        else if (coding == StringCoding::Utf16) return toUtf16(aux);
-        else if (coding == StringCoding::Utf32) return std::string((char*)&aux, (char*)&aux + sizeof(aux));
-    }
-    return "";
-}
-
 void PostTokenAnalyser::emit_character_literal(const string& data)
 {
+    stringProcessor->flush();
     auto index = data.find('\'');
     auto prefix = data.substr(0, index);
     auto str = convertEscapeSeq(data.substr(index + 1, data.size() - index - 2), StringCoding::Utf8);
@@ -422,134 +227,32 @@ void PostTokenAnalyser::emit_character_literal(const string& data)
         output->emit_invalid(data);
 }
 
-template <typename Emitter>
-void emit_user_defined_char_array(const string& data, std::string quote, Emitter output)
-{
-    auto index = data.find_last_of(quote);
-    auto value = data.substr(1, index - 1);
-    auto suffix = data.substr(index + 1);
-    if (suffix.empty() || (suffix[0] != '_'))
-        output->emit_invalid(data);
-    else if (quote == "'")
-        output->emit_user_defined_literal_character(
-            data, suffix, FundamentalTypeOf<char>(), value.c_str(), value.size());
-    else
-        output->emit_user_defined_literal_string_array(
-            data, suffix, value.size() + 1, FundamentalTypeOf<char>(), value.c_str(), value.size() + 1);
-}
-
 void PostTokenAnalyser::emit_user_defined_character_literal(const string& data)
 {
-    emit_user_defined_char_array(data, "'", output);
-}
-
-template <typename T, typename Emitter>
-void emitLiteralArray(const std::string& data, std::vector<char> value, Emitter output)
-{
-    auto size = value.size();
-    for (unsigned i = 0; i < sizeof(T) + 1; ++i) value.push_back('\0');
-    output->emit_literal_array(data, size / sizeof(T) + 1, FundamentalTypeOf<T>(), &value.front(), size + sizeof(T));
-}
-
-std::string fillCharType(unsigned size, std::string arg)
-{
-    if (size < arg.size()) return arg.substr(arg.size() - size);
-    while (arg.size() < size) arg.push_back('\0');
-    return arg;
-}
-
-template <typename CharType>
-std::vector<char> codeAndOptionallyConvertEscapeSeqs(
-    const std::string arg, StringCoding coding, bool doNotConvertEscapeSeqs)
-{
-    enum Token { Esc, Char, EoS, Utf8Char };
-    typedef std::function<void (uint64_t, std::wstring)> Handler;
-    typedef std::function<void(uint64_t, std::wstring, Handler)> InitialLinker;
-    typedef std::vector<std::pair<Token, Rule>> Definitions;
-    typedef TokenizerChain<TokenizerChainLinkType<uint64_t, uint64_t, Token>> Tokenizer;
-
-    uint64_t EndOfString = -1;
-
-    std::vector<char> out;
-    auto tokenHandler = [&](Token token, std::wstring val)
-        {
-            std::string temp(val.begin(), val.end());
-            if (token == Esc) temp = convertEscapeSeq(temp, coding);
-            else if (token == Utf8Char)
-            {
-                if (coding == StringCoding::Utf16)
-                {
-                    auto converted = utf8toInt(temp);
-                    temp = toUtf16(converted);
-                }
-                else if (coding == StringCoding::Utf32)
-                {
-                    auto converted = utf8toInt(temp);
-                    temp = std::string((char*)&converted, (char*)&converted + sizeof(converted));
-                }
-            }
-            if (token != EoS)
-            {
-                unsigned sizeOfChar = std::max(temp.size(), sizeof(CharType));
-                for (unsigned i = 0; i < sizeOfChar; ++i)
-                {
-                    if (i < temp.size()) out.push_back(temp[i]);
-                    else out.push_back('\0');
-                }
-            }
-        };
-    InitialLinker initialLinker = [](uint64_t c, std::wstring text, Handler h) { h(c, text); };
-
-    auto hex = L"\\x" >> +chset(L"0-9a-fA-F");
-    auto octDig = chset(L"0-7");
-    auto oct = L"\\" >> (octDig | (octDig >> octDig) | (octDig >> octDig >> octDig));
-    auto asciiChar = chset(L"\x00-\x7f");
-    auto utf8char = chset(L"\xc0-\xff\xffffffc0-\xffffffff") >> +chset(L"\x80-\xbf\xffffff80-\xffffffbf");
-    auto escChar = L"\\" >> anychar;
-    auto end = chset(EndOfString);
-
-    Definitions defs = {{Utf8Char, utf8char}, {Char, anychar}, {EoS, end}};
-    if (not doNotConvertEscapeSeqs) defs.push_back({Esc, hex | oct | escChar});
-    auto tokenizer = Tokenizer(tokenHandler, std::pair<InitialLinker, Definitions>(initialLinker, defs));
-    for (auto c : arg) tokenizer.handler(wcharToUint64(c), {wchar_t(c)});
-    tokenizer.handler(EndOfString, {wchar_t(EndOfString)});
-    return out;
+    stringProcessor->flush();
+    auto index = data.find_last_of("'");
+    auto value = data.substr(1, index - 1);
+    auto suffix = data.substr(index + 1);
+    if (suffix.empty() || suffix[0] != '_')
+        output->emit_invalid(data);
+    else
+        output->emit_user_defined_literal_character(
+            data, suffix, FundamentalTypeOf<char>(), value.c_str(), value.size());
 }
 
 void PostTokenAnalyser::emit_string_literal(const string& data)
 {
-    auto index = data.find('"');
-    std::string prefix = data.substr(0, index);
-    std::string value = data.substr(index + 1, data.size() - index - 2);
-    bool isRaw = false;
-    if (not prefix.empty() && (prefix[prefix.size() - 1] == 'R'))
-    {
-        prefix = prefix.substr(0, prefix.size() - 1);
-        index = value.find('(');
-        value = value.substr(index + 1, value.size() - 2 * index - 2); 
-        isRaw = true;
-    }
-    if ((prefix == "u8") || (prefix.empty()))
-        emitLiteralArray<char>(
-            data, codeAndOptionallyConvertEscapeSeqs<char>(value, StringCoding::Utf8, isRaw), output);
-    else if (prefix == "u")
-        emitLiteralArray<char16_t>(
-            data, codeAndOptionallyConvertEscapeSeqs<char16_t>(value, StringCoding::Utf16, isRaw), output);
-    else if (prefix == "U")
-        emitLiteralArray<char32_t>(
-            data, codeAndOptionallyConvertEscapeSeqs<char32_t>(value, StringCoding::Utf32, isRaw), output);
-    else if (prefix == "L")
-        emitLiteralArray<wchar_t>(
-            data, codeAndOptionallyConvertEscapeSeqs<wchar_t>(value, StringCoding::Utf32, isRaw), output);
+    stringProcessor->addString(data);
 }
 
 void PostTokenAnalyser::emit_user_defined_string_literal(const string& data)
 {
-    emit_user_defined_char_array(data, "\"", output);
+    stringProcessor->addUserDefinedString(data);
 }
 
 void PostTokenAnalyser::emit_preprocessing_op_or_punc(const string& data)
 {
+    stringProcessor->flush();
     auto it = StringToTokenTypeMap.find(data);
     if (it != StringToTokenTypeMap.end())
         output->emit_simple(data, it->second);
@@ -559,11 +262,13 @@ void PostTokenAnalyser::emit_preprocessing_op_or_punc(const string& data)
 
 void PostTokenAnalyser::emit_non_whitespace_char(const string& data)
 {
+    stringProcessor->flush();
     output->emit_invalid(data);
 }
 
 void PostTokenAnalyser::emit_eof()
 {
+    stringProcessor->flush();
     output->emit_eof();
 }
 
