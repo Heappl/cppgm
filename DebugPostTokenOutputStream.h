@@ -53,5 +53,9 @@ struct DebugPostTokenOutputStream : IPostTokenStream
 	{
 		std::cout << "eof" << std::endl;
 	}
+	void emit_new_line()
+    {
+        //ignoring
+    }
 };
 

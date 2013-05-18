@@ -50,5 +50,7 @@ struct IPostTokenStream
 	
 	// output : eof
 	virtual void emit_eof() = 0;
+
+	virtual void emit_new_line() = 0;
 };
 

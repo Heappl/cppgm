@@ -2,7 +2,8 @@
 
 apps = \
 	pptoken \
-	posttoken
+	posttoken \
+    ctrlexpr
 
 units = \
 	Helpers \
@@ -11,7 +12,8 @@ units = \
 	StandardData \
 	StateMachine \
 	StringLiteralsPostTokenProcessor \
-	PostTokenAnalyser
+	PostTokenAnalyser \
+    ControlExpressionEvaluator 
 
 all: $(apps)
 

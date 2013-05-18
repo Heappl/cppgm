@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cassert>
 #include <deque>
+#include <unordered_set>
 
 namespace
 {
